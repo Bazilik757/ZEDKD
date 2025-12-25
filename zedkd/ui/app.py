@@ -49,8 +49,8 @@ class ZEDKDGApp:
     def __init__(self, root):
         self.root = root
         self.root.title("ZEDKD | Центр управления документами")
-        self.root.geometry("1280x820")
-        self.root.minsize(1100, 720)
+        self.root.geometry("1340x880")
+        self.root.minsize(1180, 760)
 
         self.current_user = None
         self.docs = load_documents_db()
@@ -82,17 +82,26 @@ class ZEDKDGApp:
         except Exception:
             pass
 
-        self.root.configure(bg="#0f172a")
-        accent = "#5eead4"
-        surface = "#111827"
+        self.root.configure(bg="#0b1224")
+        accent = "#22d3ee"
+        surface = "#0f172a"
         muted = "#94a3b8"
+        primary = "#38bdf8"
+        secondary = "#a855f7"
+
         self.style.configure("TFrame", background=surface)
-        self.style.configure("Title.TLabel", font=("Inter", 16, "bold"), foreground=accent, background=surface)
+        self.style.configure("Title.TLabel", font=("Inter", 18, "bold"), foreground=accent, background=surface)
         self.style.configure("Muted.TLabel", foreground=muted, background=surface)
-        self.style.configure("Card.TLabelframe", background=surface, relief="solid")
+        self.style.configure("Card.TLabelframe", background=surface, relief="solid", borderwidth=1)
         self.style.configure("Card.TLabelframe.Label", background=surface, foreground=accent, font=("Inter", 11, "bold"))
-        self.style.configure("Accent.TButton", padding=8, font=("Inter", 10, "bold"))
-        self.style.map("Accent.TButton", background=[("active", accent)], foreground=[("!disabled", "#0f172a")])
+        self.style.configure("Accent.TButton", padding=10, font=("Inter", 10, "bold"))
+        self.style.map("Accent.TButton", background=[("active", accent)], foreground=[("!disabled", "#0b1224")])
+        self.style.configure("Primary.TButton", padding=10, font=("Inter", 10, "bold"))
+        self.style.map("Primary.TButton", background=[("active", primary)], foreground=[("!disabled", "#0b1224")])
+        self.style.configure("Secondary.TButton", padding=10, font=("Inter", 10, "bold"))
+        self.style.map("Secondary.TButton", background=[("active", secondary)], foreground=[("!disabled", "#0b1224")])
+        self.style.configure("Ghost.TButton", padding=6, font=("Inter", 10), relief="flat")
+        self.style.map("Ghost.TButton", foreground=[("!disabled", accent)], background=[("active", "#1f2937")])
 
     def require_user(self):
         if not self.current_user:
@@ -159,98 +168,100 @@ class ZEDKDGApp:
         shell = ttk.Frame(self.root, padding=14)
         shell.pack(fill="both", expand=True)
 
-        header = ttk.Frame(shell)
+        header = tk.Frame(shell, bg="#0b1224", padx=14, pady=14)
         header.pack(fill="x")
-        ttk.Label(header, text="ZEDKD · Центр работы с приказами", style="Title.TLabel").pack(side="left")
-        self.user_label = ttk.Label(header, textvariable=self.user_name_var, style="Muted.TLabel")
-        self.user_label.pack(side="right")
+        title_wrap = tk.Frame(header, bg="#0b1224")
+        title_wrap.pack(side="left")
+        ttk.Label(title_wrap, text="ZEDKD · Документ-центр", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(title_wrap, text="Криптография, подписи и учет в едином окне", style="Muted.TLabel").pack(anchor="w")
 
-        sub = ttk.Frame(shell)
-        sub.pack(fill="x", pady=(6, 10))
-        ttk.Label(sub, text="Маршруты, криптография и учет в едином окне", style="Muted.TLabel").pack(side="left")
-        ttk.Label(sub, textvariable=self.status_var, style="Muted.TLabel").pack(side="right")
+        user_wrap = tk.Frame(header, bg="#0b1224")
+        user_wrap.pack(side="right")
+        ttk.Label(user_wrap, textvariable=self.user_name_var, style="Muted.TLabel").pack(anchor="e")
+        ttk.Button(user_wrap, text="Сменить пользователя", command=self.change_user, style="Ghost.TButton").pack(anchor="e", pady=(6, 0))
 
-        body = ttk.Frame(shell)
-        body.pack(fill="both", expand=True)
+        ribbon = ttk.Frame(shell, padding=(0, 8))
+        ribbon.pack(fill="x")
+        ttk.Button(ribbon, text="Регистрация файла", command=self.register_document_dialog, style="Accent.TButton").pack(side="left", padx=(0, 8))
+        ttk.Button(ribbon, text="Автопроход", command=self.run_all_steps, style="Primary.TButton").pack(side="left", padx=8)
+        ttk.Button(ribbon, text="Следующий этап", command=self.run_next_step, style="Secondary.TButton").pack(side="left", padx=8)
+        ttk.Button(ribbon, text="Сгенерировать ключи", command=self.handle_generate_keys).pack(side="left", padx=8)
+        ttk.Label(ribbon, textvariable=self.status_var, style="Muted.TLabel").pack(side="right")
 
-        main_split = ttk.Panedwindow(body, orient="horizontal")
-        main_split.pack(fill="both", expand=True)
+        shell_body = ttk.Frame(shell)
+        shell_body.pack(fill="both", expand=True)
 
-        nav = ttk.Frame(main_split, width=260, padding=(10, 12))
-        nav.configure(style="TFrame")
-        main_split.add(nav, weight=0)
-
-        self.content = ttk.Frame(main_split)
-        main_split.add(self.content, weight=1)
+        self.main_tabs = ttk.Notebook(shell_body)
+        self.main_tabs.pack(fill="both", expand=True)
 
         self.views: Dict[str, ttk.Frame] = {}
-        self._build_nav(nav)
+        self.tab_ids: Dict[str, Any] = {}
+
         self.build_flow_view()
         self.build_forms_view()
         self.build_audit_view()
 
+        self.main_tabs.bind("<<NotebookTabChanged>>", self._sync_tab_selection)
+
         status_bar = ttk.Label(shell, textvariable=self.status_var, anchor="w", relief="sunken")
         status_bar.pack(fill="x", side="bottom", pady=(10, 0))
 
-    def _build_nav(self, nav: ttk.Frame):
-        ttk.Label(nav, text="Режимы", style="Muted.TLabel").pack(anchor="w", pady=(0, 6))
-        for key, text in [("flow", "Маршрут приказа"), ("forms", "Журналы учета"), ("audit", "Мониторинг действий")]:
-            btn = ttk.Radiobutton(nav, text=text, value=key, variable=self.active_view, command=lambda k=key: self.switch_view(k))
-            btn.pack(fill="x", pady=4)
-
-        ttk.Separator(nav, orient="horizontal").pack(fill="x", pady=10)
-        quick = ttk.LabelFrame(nav, text="Быстрые действия", padding=10, style="Card.TLabelframe")
-        quick.pack(fill="x")
-        ttk.Button(quick, text="Сменить пользователя", command=self.change_user, style="Accent.TButton").pack(fill="x", pady=4)
-        ttk.Button(quick, text="Сгенерировать ключи", command=self.handle_generate_keys).pack(fill="x", pady=4)
-        ttk.Button(quick, text="Регистрация файла", command=self.register_document_dialog).pack(fill="x", pady=4)
-
     def switch_view(self, key: str):
         self.active_view.set(key)
-        for name, frame in self.views.items():
-            frame.pack_forget()
-        if key in self.views:
-            self.views[key].pack(fill="both", expand=True)
+        if key in self.tab_ids:
+            self.main_tabs.select(self.tab_ids[key])
+
+    def _sync_tab_selection(self, _event=None):
+        current = self.main_tabs.select()
+        for key, tab in self.tab_ids.items():
+            if tab == current:
+                self.active_view.set(key)
 
     def build_flow_view(self):
-        frame = ttk.Frame(self.content, padding=10)
+        frame = ttk.Frame(self.main_tabs, padding=12)
+        self.main_tabs.add(frame, text="Маршрут")
         self.views["flow"] = frame
+        self.tab_ids["flow"] = frame
 
-        hero = ttk.LabelFrame(frame, text="Живая карточка приказа", padding=12, style="Card.TLabelframe")
+        hero = ttk.LabelFrame(frame, text="Карточка документа", padding=14, style="Card.TLabelframe")
         hero.pack(fill="x")
 
         top_row = ttk.Frame(hero)
-        top_row.pack(fill="x", pady=(0, 4))
+        top_row.pack(fill="x", pady=(0, 6))
         self.loaded_file_label = ttk.Label(top_row, text="Файл не выбран", style="Muted.TLabel")
         self.loaded_file_label.pack(side="left")
-        ttk.Button(top_row, text="Загрузить и зарегистрировать", command=self.register_document_dialog, style="Accent.TButton").pack(side="right", padx=4)
-        ttk.Button(top_row, text="Следующий этап", command=self.run_next_step).pack(side="right", padx=4)
-        ttk.Button(top_row, text="Автопроход", command=self.run_all_steps).pack(side="right", padx=4)
+        ttk.Label(top_row, textvariable=self.status_var, style="Muted.TLabel").pack(side="right")
+
+        actions_row = ttk.Frame(hero)
+        actions_row.pack(fill="x", pady=(4, 0))
+        ttk.Button(actions_row, text="Загрузить и зарегистрировать", command=self.register_document_dialog, style="Primary.TButton").pack(side="left", padx=(0, 6))
+        ttk.Button(actions_row, text="Подписать", command=self.sign_now, style="Secondary.TButton").pack(side="left", padx=6)
+        ttk.Button(actions_row, text="Проверить подпись", command=self.verify_now).pack(side="left", padx=6)
+        ttk.Button(actions_row, text="Зашифровать", command=self.encrypt_now).pack(side="left", padx=6)
+        ttk.Button(actions_row, text="Расшифровать", command=self.decrypt_now).pack(side="left", padx=6)
 
         cards = ttk.Frame(hero)
-        cards.pack(fill="x", pady=(6, 0))
+        cards.pack(fill="x", pady=(10, 0))
 
         user_card = ttk.LabelFrame(cards, text="Пользователь", padding=10, style="Card.TLabelframe")
         user_card.pack(side="left", fill="x", expand=True, padx=(0, 8))
         ttk.Label(user_card, textvariable=self.user_name_var, style="Muted.TLabel").pack(anchor="w")
-        ttk.Label(user_card, textvariable=self.status_var, style="Muted.TLabel").pack(anchor="w")
-        ttk.Button(user_card, text="Сменить", command=self.change_user).pack(anchor="w", pady=(6, 0))
+        ttk.Button(user_card, text="Сменить пользователя", command=self.change_user, style="Ghost.TButton").pack(anchor="w", pady=(8, 0))
+        ttk.Button(user_card, text="Сгенерировать ключи", command=self.handle_generate_keys, style="Ghost.TButton").pack(anchor="w", pady=(6, 0))
 
-        crypto_card = ttk.LabelFrame(cards, text="Криптооперации", padding=10, style="Card.TLabelframe")
+        crypto_card = ttk.LabelFrame(cards, text="Контроль", padding=10, style="Card.TLabelframe")
         crypto_card.pack(side="left", fill="x", expand=True)
         ttk.Button(crypto_card, text="Проверка целостности", command=self.check_integrity_button).pack(anchor="w", pady=2)
-        ttk.Button(crypto_card, text="Подписать документ", command=self.sign_now).pack(anchor="w", pady=2)
-        ttk.Button(crypto_card, text="Проверить подпись", command=self.verify_now).pack(anchor="w", pady=2)
-        ttk.Button(crypto_card, text="Зашифровать", command=self.encrypt_now).pack(anchor="w", pady=2)
-        ttk.Button(crypto_card, text="Расшифровать", command=self.decrypt_now).pack(anchor="w", pady=2)
+        ttk.Button(crypto_card, text="Следующий этап", command=self.run_next_step, style="Primary.TButton").pack(anchor="w", pady=4)
+        ttk.Button(crypto_card, text="Автопроход", command=self.run_all_steps, style="Secondary.TButton").pack(anchor="w", pady=4)
 
         body = ttk.Frame(frame)
         body.pack(fill="both", expand=True, pady=(12, 0))
 
-        list_wrap = ttk.LabelFrame(body, text="Активные документы", padding=10, style="Card.TLabelframe")
-        list_wrap.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        list_wrap = ttk.LabelFrame(body, text="Документы", padding=10, style="Card.TLabelframe")
+        list_wrap.pack(side="left", fill="both", expand=True, padx=(0, 12))
 
-        self.docs_tree = ttk.Treeview(list_wrap, columns=("id", "type", "title", "status"), show="headings", height=14)
+        self.docs_tree = ttk.Treeview(list_wrap, columns=("id", "type", "title", "status"), show="headings", height=16)
         for col, w, label in [("id", 160, "ID"), ("type", 120, "Тип"), ("title", 340, "Заголовок"), ("status", 260, "Статус")]:
             self.docs_tree.heading(col, text=label)
             self.docs_tree.column(col, width=w, anchor="w")
@@ -258,14 +269,14 @@ class ZEDKDGApp:
         self.docs_tree.bind("<<TreeviewSelect>>", self.on_select_doc)
 
         doc_actions = ttk.Frame(list_wrap)
-        doc_actions.pack(fill="x", pady=(8, 0))
-        ttk.Button(doc_actions, text="Открыть файл", command=self.open_doc_file).pack(side="left")
-        ttk.Button(doc_actions, text="Удалить", command=self.delete_selected_doc).pack(side="left", padx=6)
+        doc_actions.pack(fill="x", pady=(10, 0))
+        ttk.Button(doc_actions, text="Открыть", command=self.open_doc_file, style="Ghost.TButton").pack(side="left")
+        ttk.Button(doc_actions, text="Удалить", command=self.delete_selected_doc, style="Ghost.TButton").pack(side="left", padx=6)
 
         right = ttk.Frame(body)
         right.pack(side="left", fill="both", expand=True)
 
-        card = ttk.LabelFrame(right, text="Карточка маршрута", padding=12, style="Card.TLabelframe")
+        card = ttk.LabelFrame(right, text="Сводка", padding=12, style="Card.TLabelframe")
         card.pack(fill="x")
 
         self.card_vars = {k: tk.StringVar(value="") for k in [
@@ -308,8 +319,10 @@ class ZEDKDGApp:
         ttk.Button(wf_btns, text="Все шаги", command=self.run_all_steps).pack(side="left", padx=6)
 
     def build_forms_view(self):
-        frame = ttk.Frame(self.content, padding=12)
+        frame = ttk.Frame(self.main_tabs, padding=12)
+        self.main_tabs.add(frame, text="Журналы")
         self.views["forms"] = frame
+        self.tab_ids["forms"] = frame
 
         header = ttk.LabelFrame(frame, text="Журналы учета", padding=10, style="Card.TLabelframe")
         header.pack(fill="x")
@@ -360,13 +373,15 @@ class ZEDKDGApp:
         self.form_views[form_no] = {"tree": tree, "columns": columns}
 
     def build_audit_view(self):
-        frame = ttk.Frame(self.content, padding=12)
+        frame = ttk.Frame(self.main_tabs, padding=12)
+        self.main_tabs.add(frame, text="Мониторинг")
         self.views["audit"] = frame
+        self.tab_ids["audit"] = frame
 
         header = ttk.LabelFrame(frame, text="Мониторинг действий", padding=10, style="Card.TLabelframe")
         header.pack(fill="x")
         ttk.Label(header, text="Отслеживание регистраций, шагов маршрута и криптографии", style="Muted.TLabel").pack(anchor="w")
-        ttk.Button(header, text="Обновить", command=self.refresh_audit).pack(anchor="e", pady=(6, 0))
+        ttk.Button(header, text="Обновить", command=self.refresh_audit, style="Ghost.TButton").pack(anchor="e", pady=(6, 0))
 
         wrap = ttk.Frame(frame)
         wrap.pack(fill="both", expand=True, pady=(10, 0))
