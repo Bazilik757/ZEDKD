@@ -3,7 +3,7 @@ import os
 import shutil
 import tkinter as tk
 from datetime import datetime
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 from typing import Optional, Dict, Any, List
 
 from ..crypto import (
