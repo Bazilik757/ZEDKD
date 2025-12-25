@@ -49,6 +49,11 @@ def sign_document(username: str, file_path: str, doc_id: Optional[str] = None) -
         data = f.read()
 
     doc_hash = calc_doc_hash_bytes(data)
+    index_key = f"signature_index:{doc_hash}:{username}"
+    existing_sig = safe_load_data(index_key, None)
+    if existing_sig:
+        raise ValueError("Пользователь уже подписывал этот документ")
+
     private_key_bytes = bytes.fromhex(keys["private_key"])
     signature_raw = hashlib.sha256(bytes.fromhex(doc_hash) + private_key_bytes).hexdigest()
 
@@ -57,10 +62,14 @@ def sign_document(username: str, file_path: str, doc_id: Optional[str] = None) -
         "username": username,
         "signature": signature_raw,
         "timestamp": now_iso(),
+        "doc_id": doc_id,
     }
 
     sig_id = f"signature:{os.path.basename(file_path)}:{signature['timestamp']}"
     safe_save_data(sig_id, signature)
+    if doc_id:
+        safe_save_data(f"signature_doc_index:{doc_id}", sig_id)
+    safe_save_data(index_key, sig_id)
 
     log_event(username, "sign", "ok", doc_id=doc_id or os.path.basename(file_path), extra={"sig_id": sig_id})
     return sig_id

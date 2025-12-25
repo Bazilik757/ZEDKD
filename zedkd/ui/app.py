@@ -30,7 +30,15 @@ from ..forms import (
     upsert_form_row,
 )
 from ..paths import ARCHIVE_DIR, DOCUMENTS_DIR
-from ..utils import calc_file_hash, load_audit_events, log_event, next_seq, now_iso, relpath_in_storage
+from ..utils import (
+    calc_file_hash,
+    load_audit_events,
+    log_event,
+    next_seq,
+    now_iso,
+    relpath_in_storage,
+    safe_load_data,
+)
 from .dialogs import RowEditorDialog
 
 
@@ -96,6 +104,20 @@ class ZEDKDGApp:
         for d in self.docs:
             if d.doc_id == self.current_doc_id:
                 return d
+        return None
+
+    def _resolve_signature_id(self, d: DocumentRecord) -> Optional[str]:
+        """Return a persisted signature id for the document without prompting the user."""
+
+        if d.sig_path:
+            return d.sig_path
+
+        if d.doc_id:
+            sig_id = safe_load_data(f"signature_doc_index:{d.doc_id}", None)
+            if sig_id:
+                d.sig_path = sig_id
+                self.save_all()
+                return sig_id
         return None
 
     def save_all(self):
@@ -936,19 +958,22 @@ class ZEDKDGApp:
 
             # 5) Исполнение: проверка подписи
             elif step_idx == 5:
-                if not d.sig_path or not os.path.exists(d.sig_path):
-                    sig_path = filedialog.askopenfilename(
-                        title="Выберите файл подписи",
-                        filetypes=[("Подпись", "*.sig.pkl"), ("Все файлы", "*.*")]
+                sig_id = self._resolve_signature_id(d)
+                if not sig_id:
+                    raise ValueError(
+                        "Подпись для документа отсутствует. Сначала выполните этап подписания."
                     )
-                    if not sig_path:
-                        raise ValueError("Файл подписи не выбран")
-                    d.sig_path = sig_path
 
-                ok = verify_signature(d.stored_path, d.sig_path)
+                sig_payload = safe_load_data(sig_id, None)
+                if sig_payload is None:
+                    raise ValueError(
+                        "Сохранённая подпись не найдена в базе данных. Повторите подписание документа."
+                    )
+
+                ok = verify_signature(d.stored_path, sig_id)
                 d.status = "Исполнение: подпись проверена (OK)" if ok else "Исполнение: подпись НЕ прошла"
                 log_event(self.current_user, "order_verify_signature", "ok" if ok else "fail",
-                          doc_id=d.doc_id, extra={"sig_path": d.sig_path})
+                          doc_id=d.doc_id, extra={"sig_path": sig_id})
 
                 self._update_form3_location(d.doc_id, "Подпись проверена" if ok else "Проблема подписи")
 
@@ -1079,16 +1104,18 @@ class ZEDKDGApp:
         if not d:
             messagebox.showwarning("Нет документа", "Выберите документ.")
             return
-        if not d.sig_path:
-            messagebox.showwarning(
-                "Подпись не найдена",
-                "Для проверки подписи сначала подпишите документ (через этап маршрута или кнопку \"Подписать\").",
-            )
-            return
         try:
-            ok = verify_signature(d.stored_path, d.sig_path)
+            sig_id = self._resolve_signature_id(d)
+            if not sig_id:
+                messagebox.showwarning(
+                    "Подпись не найдена",
+                    "Подписание документа не зафиксировано в базе. Подпишите его, после чего проверка выполнится автоматически.",
+                )
+                return
+
+            ok = verify_signature(d.stored_path, sig_id)
             log_event(self.current_user or "system", "verify_manual", "ok" if ok else "fail",
-                      doc_id=d.doc_id, extra={"sig_path": d.sig_path})
+                      doc_id=d.doc_id, extra={"sig_path": sig_id})
             messagebox.showinfo("Проверка подписи", "Подпись действительна." if ok else "Подпись недействительна / документ изменён.")
             self.refresh_audit()
         except Exception as e:
