@@ -60,6 +60,12 @@ class ZEDKDGApp:
         self.user_name_var = tk.StringVar(value="Пользователь: (не выбран)")
         self.active_view = tk.StringVar(value="flow")
 
+        self.metrics_vars = {
+            "total": tk.StringVar(value="0"),
+            "signed": tk.StringVar(value="0"),
+            "encrypted": tk.StringVar(value="0"),
+        }
+
         self.style = ttk.Style()
         self._init_style()
 
@@ -85,23 +91,41 @@ class ZEDKDGApp:
         self.root.configure(bg="#0b1224")
         accent = "#22d3ee"
         surface = "#0f172a"
+        card = "#0e162a"
         muted = "#94a3b8"
         primary = "#38bdf8"
         secondary = "#a855f7"
+        success = "#22c55e"
 
         self.style.configure("TFrame", background=surface)
-        self.style.configure("Title.TLabel", font=("Inter", 18, "bold"), foreground=accent, background=surface)
-        self.style.configure("Muted.TLabel", foreground=muted, background=surface)
-        self.style.configure("Card.TLabelframe", background=surface, relief="solid", borderwidth=1)
-        self.style.configure("Card.TLabelframe.Label", background=surface, foreground=accent, font=("Inter", 11, "bold"))
-        self.style.configure("Accent.TButton", padding=10, font=("Inter", 10, "bold"))
+        self.style.configure("Panel.TFrame", background=surface)
+        self.style.configure("Glass.TFrame", background=card)
+        self.style.configure("Title.TLabel", font=("Inter", 19, "bold"), foreground=accent, background=surface)
+        self.style.configure("Muted.TLabel", foreground=muted, background=surface, font=("Inter", 10))
+        self.style.configure("Pill.TLabel", background="#1e293b", foreground="#e2e8f0", padding=(10, 4), font=("Inter", 9, "bold"))
+        self.style.configure("Card.TLabelframe", background=card, relief="solid", borderwidth=1)
+        self.style.configure("Card.TLabelframe.Label", background=card, foreground=accent, font=("Inter", 11, "bold"))
+        self.style.configure("Accent.TButton", padding=10, font=("Inter", 10, "bold"), relief="flat")
         self.style.map("Accent.TButton", background=[("active", accent)], foreground=[("!disabled", "#0b1224")])
-        self.style.configure("Primary.TButton", padding=10, font=("Inter", 10, "bold"))
+        self.style.configure("Primary.TButton", padding=12, font=("Inter", 10, "bold"), relief="flat")
         self.style.map("Primary.TButton", background=[("active", primary)], foreground=[("!disabled", "#0b1224")])
-        self.style.configure("Secondary.TButton", padding=10, font=("Inter", 10, "bold"))
+        self.style.configure("Secondary.TButton", padding=12, font=("Inter", 10, "bold"), relief="flat")
         self.style.map("Secondary.TButton", background=[("active", secondary)], foreground=[("!disabled", "#0b1224")])
-        self.style.configure("Ghost.TButton", padding=6, font=("Inter", 10), relief="flat")
+        self.style.configure("Ghost.TButton", padding=8, font=("Inter", 10), relief="flat")
         self.style.map("Ghost.TButton", foreground=[("!disabled", accent)], background=[("active", "#1f2937")])
+        self.style.configure("CTA.TButton", padding=12, font=("Inter", 11, "bold"), relief="flat")
+        self.style.map("CTA.TButton", background=[("!disabled", "#f97316"), ("active", "#fb923c")], foreground=[("!disabled", "#0b1224")])
+        self.style.configure("Nav.TButton", padding=(14, 10), font=("Inter", 10, "bold"), relief="flat", background="#111827")
+        self.style.map("Nav.TButton", background=[("active", "#1f2937")], foreground=[("!disabled", "#cbd5e1")])
+
+        self.style.configure("Modern.Treeview", background=card, fieldbackground=card, foreground="#e2e8f0", rowheight=26, borderwidth=0)
+        self.style.map("Modern.Treeview", background=[("selected", "#1d4ed8")], foreground=[("selected", "#e2e8f0")])
+        self.style.configure("Modern.Treeview.Heading", background=surface, foreground="#cbd5e1", relief="flat", font=("Inter", 10, "bold"))
+        self.style.configure("Modern.TNotebook", background=surface, tabposition="n")
+        self.style.configure("Modern.TNotebook.Tab", padding=(16, 10), background=card, foreground="#e2e8f0", font=("Inter", 10, "bold"))
+        self.style.map("Modern.TNotebook.Tab", background=[("selected", "#1f2937")], foreground=[("selected", accent)])
+
+        self.style.configure("Success.TLabel", foreground=success, background=surface, font=("Inter", 10, "bold"))
 
     def require_user(self):
         if not self.current_user:
@@ -135,6 +159,15 @@ class ZEDKDGApp:
     def save_all(self):
         save_documents_db(self.docs)
 
+    def refresh_metrics(self):
+        total = len(self.docs)
+        signed = sum(1 for d in self.docs if d.sig_path)
+        encrypted = sum(1 for d in self.docs if d.enc_path)
+
+        self.metrics_vars["total"].set(str(total))
+        self.metrics_vars["signed"].set(str(signed))
+        self.metrics_vars["encrypted"].set(str(encrypted))
+
     def ensure_integrity_before_step(self, d: DocumentRecord) -> bool:
         """
         ВАЖНО: по-хорошему, на каждом шаге проверяем, что исходный файл не изменили.
@@ -165,33 +198,52 @@ class ZEDKDGApp:
     # -------------------------
 
     def build_ui(self):
-        shell = ttk.Frame(self.root, padding=14)
+        shell = tk.Frame(self.root, bg="#0b1224", padx=16, pady=16)
         shell.pack(fill="both", expand=True)
 
-        header = tk.Frame(shell, bg="#0b1224", padx=14, pady=14)
+        header = tk.Frame(shell, bg="#0b1224")
         header.pack(fill="x")
-        title_wrap = tk.Frame(header, bg="#0b1224")
-        title_wrap.pack(side="left")
-        ttk.Label(title_wrap, text="ZEDKD · Документ-центр", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(title_wrap, text="Криптография, подписи и учет в едином окне", style="Muted.TLabel").pack(anchor="w")
 
-        user_wrap = tk.Frame(header, bg="#0b1224")
-        user_wrap.pack(side="right")
-        ttk.Label(user_wrap, textvariable=self.user_name_var, style="Muted.TLabel").pack(anchor="e")
-        ttk.Button(user_wrap, text="Сменить пользователя", command=self.change_user, style="Ghost.TButton").pack(anchor="e", pady=(6, 0))
+        hero = tk.Frame(header, bg="#0f172a", padx=16, pady=16, highlightbackground="#1e293b", highlightthickness=1)
+        hero.pack(fill="x")
 
-        ribbon = ttk.Frame(shell, padding=(0, 8))
-        ribbon.pack(fill="x")
-        ttk.Button(ribbon, text="Регистрация файла", command=self.register_document_dialog, style="Accent.TButton").pack(side="left", padx=(0, 8))
-        ttk.Button(ribbon, text="Автопроход", command=self.run_all_steps, style="Primary.TButton").pack(side="left", padx=8)
-        ttk.Button(ribbon, text="Следующий этап", command=self.run_next_step, style="Secondary.TButton").pack(side="left", padx=8)
-        ttk.Button(ribbon, text="Сгенерировать ключи", command=self.handle_generate_keys).pack(side="left", padx=8)
-        ttk.Label(ribbon, textvariable=self.status_var, style="Muted.TLabel").pack(side="right")
+        hero_left = tk.Frame(hero, bg="#0f172a")
+        hero_left.pack(side="left", fill="x", expand=True)
+        ttk.Label(hero_left, text="ZEDKD · Центр управления документами", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(hero_left, text="Современный поток работы с криптографией и журналами", style="Muted.TLabel").pack(anchor="w", pady=(4, 0))
 
-        shell_body = ttk.Frame(shell)
+        hero_right = tk.Frame(hero, bg="#0f172a")
+        hero_right.pack(side="right")
+        ttk.Label(hero_right, textvariable=self.user_name_var, style="Muted.TLabel").pack(anchor="e")
+        ttk.Label(hero_right, textvariable=self.status_var, style="Pill.TLabel").pack(anchor="e", pady=(6, 0))
+        ttk.Button(hero_right, text="Сменить пользователя", command=self.change_user, style="Ghost.TButton").pack(anchor="e", pady=(8, 0))
+
+        metrics = tk.Frame(shell, bg="#0b1224")
+        metrics.pack(fill="x", pady=(12, 6))
+
+        def make_metric(title: str, var: tk.StringVar, accent: str):
+            box = tk.Frame(metrics, bg="#0e162a", padx=14, pady=12, highlightbackground="#1e293b", highlightthickness=1)
+            box.pack(side="left", fill="x", expand=True, padx=6)
+            ttk.Label(box, text=title, style="Muted.TLabel").pack(anchor="w")
+            ttk.Label(box, textvariable=var, style="Title.TLabel").pack(anchor="w", pady=(2, 0))
+            ttk.Label(box, text="в базе", foreground=accent, background="#0e162a", font=("Inter", 9, "bold")).pack(anchor="w", pady=(2, 0))
+
+        make_metric("Документов", self.metrics_vars["total"], "#38bdf8")
+        make_metric("Подписано", self.metrics_vars["signed"], "#22c55e")
+        make_metric("Зашифровано", self.metrics_vars["encrypted"], "#f59e0b")
+
+        action_bar = tk.Frame(shell, bg="#0b1224")
+        action_bar.pack(fill="x", pady=(6, 10))
+        tk.Frame(action_bar, bg="#1e293b", height=1).pack(fill="x", pady=(0, 10))
+        ttk.Button(action_bar, text="Регистрация файла", command=self.register_document_dialog, style="CTA.TButton").pack(side="left", padx=(0, 8))
+        ttk.Button(action_bar, text="Автопроход", command=self.run_all_steps, style="Primary.TButton").pack(side="left", padx=8)
+        ttk.Button(action_bar, text="Следующий этап", command=self.run_next_step, style="Secondary.TButton").pack(side="left", padx=8)
+        ttk.Button(action_bar, text="Сгенерировать ключи", command=self.handle_generate_keys, style="Ghost.TButton").pack(side="left", padx=8)
+
+        shell_body = ttk.Frame(shell, padding=4, style="Panel.TFrame")
         shell_body.pack(fill="both", expand=True)
 
-        self.main_tabs = ttk.Notebook(shell_body)
+        self.main_tabs = ttk.Notebook(shell_body, style="Modern.TNotebook")
         self.main_tabs.pack(fill="both", expand=True)
 
         self.views: Dict[str, ttk.Frame] = {}
@@ -261,7 +313,7 @@ class ZEDKDGApp:
         list_wrap = ttk.LabelFrame(body, text="Документы", padding=10, style="Card.TLabelframe")
         list_wrap.pack(side="left", fill="both", expand=True, padx=(0, 12))
 
-        self.docs_tree = ttk.Treeview(list_wrap, columns=("id", "type", "title", "status"), show="headings", height=16)
+        self.docs_tree = ttk.Treeview(list_wrap, columns=("id", "type", "title", "status"), show="headings", height=16, style="Modern.Treeview")
         for col, w, label in [("id", 160, "ID"), ("type", 120, "Тип"), ("title", 340, "Заголовок"), ("status", 260, "Статус")]:
             self.docs_tree.heading(col, text=label)
             self.docs_tree.column(col, width=w, anchor="w")
@@ -328,7 +380,7 @@ class ZEDKDGApp:
         header.pack(fill="x")
         ttk.Label(header, text="Работа с электронными журналами форм 1–9", style="Muted.TLabel").pack(anchor="w")
 
-        self.forms_notebook = ttk.Notebook(frame)
+        self.forms_notebook = ttk.Notebook(frame, style="Modern.TNotebook")
         self.forms_notebook.pack(fill="both", expand=True, pady=(10, 0))
 
         self.form_views = {}
@@ -347,7 +399,7 @@ class ZEDKDGApp:
         wrap = ttk.Frame(parent)
         wrap.pack(fill="both", expand=True)
 
-        tree = ttk.Treeview(wrap, columns=[f"c{i}" for i in range(len(columns))], show="headings")
+        tree = ttk.Treeview(wrap, columns=[f"c{i}" for i in range(len(columns))], show="headings", style="Modern.Treeview")
         for i, col_name in enumerate(columns):
             tree.heading(f"c{i}", text=col_name)
             tree.column(f"c{i}", width=220, anchor="w")
@@ -389,7 +441,8 @@ class ZEDKDGApp:
         self.audit_tree = ttk.Treeview(
             wrap,
             columns=("ts", "user", "action", "result", "doc"),
-            show="headings"
+            show="headings",
+            style="Modern.Treeview"
         )
         for col, w, name in [
             ("ts", 180, "Дата/время"),
@@ -698,6 +751,7 @@ class ZEDKDGApp:
             self.docs_tree.delete(i)
         for d in self.docs:
             self.docs_tree.insert("", "end", values=(d.doc_id, d.doc_type, d.title, d.status))
+        self.refresh_metrics()
 
     def select_doc(self, doc_id: str):
         self.current_doc_id = doc_id
