@@ -3,7 +3,7 @@ import os
 import shutil
 import tkinter as tk
 from datetime import datetime
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, ttk
 from typing import Optional, Dict, Any, List
 
 from ..crypto import (
@@ -38,6 +38,8 @@ from ..utils import (
     now_iso,
     relpath_in_storage,
     safe_load_data,
+    list_users,
+    add_user,
 )
 from .dialogs import RowEditorDialog
 
@@ -399,11 +401,72 @@ class ZEDKDGApp:
     # -------------------------
 
     def change_user(self):
-        username = simpledialog.askstring("Пользователь", "Введите имя пользователя:")
-        if username:
-            self.current_user = username.strip()
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Пользователи")
+        dlg.geometry("520x420")
+        dlg.transient(self.root)
+        dlg.grab_set()
+
+        wrap = ttk.Frame(dlg, padding=10)
+        wrap.pack(fill="both", expand=True)
+
+        ttk.Label(wrap, text="Выберите существующего пользователя или добавьте нового").pack(anchor="w", pady=(0, 8))
+
+        columns = ("id", "username", "created")
+        tree = ttk.Treeview(wrap, columns=columns, show="headings", height=10)
+        tree.heading("id", text="ID")
+        tree.heading("username", text="Имя")
+        tree.heading("created", text="Создан")
+        tree.column("id", width=60, anchor="center")
+        tree.column("username", width=200, anchor="w")
+        tree.column("created", width=180, anchor="w")
+        tree.pack(fill="both", expand=True)
+
+        entry_frame = ttk.Frame(wrap)
+        entry_frame.pack(fill="x", pady=(8, 0))
+        ttk.Label(entry_frame, text="Новый пользователь:").pack(side="left")
+        name_var = tk.StringVar()
+        name_entry = ttk.Entry(entry_frame, textvariable=name_var)
+        name_entry.pack(side="left", fill="x", expand=True, padx=6)
+        status_lbl = ttk.Label(wrap, text="", foreground="#64748b")
+        status_lbl.pack(anchor="w", pady=(4, 0))
+
+        btns = ttk.Frame(wrap)
+        btns.pack(fill="x", pady=(10, 0))
+        ttk.Button(btns, text="Выбрать", command=lambda: finish_select(tree)).pack(side="left")
+        ttk.Button(btns, text="Добавить", command=lambda: add_new()).pack(side="right")
+        ttk.Button(btns, text="Закрыть", command=dlg.destroy).pack(side="right", padx=6)
+
+        def refresh_users():
+            for i in tree.get_children():
+                tree.delete(i)
+            for u in list_users():
+                tree.insert("", "end", values=(u["id"], u["username"], u["created_at"]))
+
+        def finish_select(tv: ttk.Treeview):
+            sel = tv.selection()
+            if not sel:
+                messagebox.showwarning("Выбор", "Выберите пользователя из списка")
+                return
+            vals = tv.item(sel[0], "values")
+            username = vals[1]
+            self.current_user = username
             self.user_name_var.set(f"Пользователь: {self.current_user}")
             self.set_status(f"Пользователь: {self.current_user}")
+            dlg.destroy()
+
+        def add_new():
+            try:
+                created = add_user(name_var.get())
+                status_lbl.config(text=f"Добавлен: {created['username']}")
+                name_var.set("")
+                refresh_users()
+            except Exception as e:
+                messagebox.showerror("Ошибка", str(e))
+
+        refresh_users()
+        tree.bind("<Double-1>", lambda _: finish_select(tree))
+        name_entry.focus_set()
 
     def handle_generate_keys(self):
         if not self.require_user():

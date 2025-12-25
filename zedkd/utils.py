@@ -12,6 +12,8 @@ __all__ = [
     "safe_save_data",
     "log_event",
     "load_audit_events",
+    "list_users",
+    "add_user",
     "calc_doc_hash_bytes",
     "calc_file_hash",
     "next_seq",
@@ -57,6 +59,15 @@ def _ensure_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
 
 
 def safe_load_data(key: str, default: Any):
@@ -81,6 +92,46 @@ def safe_save_data(key: str, obj: Any) -> None:
             "INSERT INTO kv_store(key, data) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET data = excluded.data",
             (key, payload),
         )
+
+
+def list_users() -> list[dict]:
+    """Return all registered users ordered by name."""
+
+    _ensure_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute(
+            "SELECT id, username, created_at FROM users ORDER BY username"
+        ).fetchall()
+    return [
+        {"id": row[0], "username": row[1], "created_at": row[2]}
+        for row in rows
+    ]
+
+
+def add_user(username: str) -> dict:
+    """Create a new user if it does not already exist."""
+
+    clean_name = (username or "").strip()
+    if not clean_name:
+        raise ValueError("Имя пользователя не может быть пустым")
+
+    _ensure_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        exists = conn.execute(
+            "SELECT 1 FROM users WHERE username = ?",
+            (clean_name,),
+        ).fetchone()
+        if exists:
+            raise ValueError("Такой пользователь уже существует")
+
+        created_at = now_iso()
+        cur = conn.execute(
+            "INSERT INTO users(username, created_at) VALUES(?, ?)",
+            (clean_name, created_at),
+        )
+        user_id = cur.lastrowid
+
+    return {"id": user_id, "username": clean_name, "created_at": created_at}
 
 
 def log_event(user: str, action: str, result: str, doc_id: str | None = None, extra: dict | None = None) -> None:
