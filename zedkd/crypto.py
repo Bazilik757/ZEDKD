@@ -19,6 +19,11 @@ __all__ = [
 
 
 def generate_keys(username: str) -> str:
+    existing = safe_load_data(f"keys:{username}", None)
+    if existing and existing.get("private_key") and existing.get("public_key"):
+        log_event(username, "generate_keys", "skip", extra={"reason": "already_exists"})
+        raise ValueError("Ключи уже созданы для этого пользователя")
+
     private_key = secrets.token_bytes(32)
     public_key = hashlib.sha256(private_key).hexdigest()
     key_data = {

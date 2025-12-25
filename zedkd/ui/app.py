@@ -40,6 +40,7 @@ from ..utils import (
     safe_load_data,
     list_users,
     add_user,
+    user_has_keys,
 )
 from .dialogs import RowEditorDialog
 
@@ -477,6 +478,13 @@ class ZEDKDGApp:
         if not self.require_user():
             return
         try:
+            if user_has_keys(self.current_user):
+                messagebox.showinfo(
+                    "Ключи уже созданы",
+                    "Для выбранного пользователя ключи уже существуют. Повторное создание запрещено.",
+                )
+                self.set_status("Генерация ключей отменена: уже существуют")
+                return
             key_id = generate_keys(self.current_user)
             messagebox.showinfo("Ключи созданы", f"Идентификатор ключей: {key_id}")
             self.set_status("Ключи успешно созданы")
