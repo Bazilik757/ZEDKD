@@ -14,6 +14,7 @@ __all__ = [
     "load_audit_events",
     "list_users",
     "add_user",
+    "user_has_keys",
     "calc_doc_hash_bytes",
     "calc_file_hash",
     "next_seq",
@@ -103,7 +104,12 @@ def list_users() -> list[dict]:
             "SELECT id, username, created_at FROM users ORDER BY username"
         ).fetchall()
     return [
-        {"id": row[0], "username": row[1], "created_at": row[2]}
+        {
+            "id": row[0],
+            "username": row[1],
+            "created_at": row[2],
+            "has_keys": user_has_keys(row[1]),
+        }
         for row in rows
     ]
 
@@ -214,3 +220,10 @@ def relpath_in_storage(abs_path: str) -> str:
         return os.path.relpath(abs_path, STORAGE_DIR)
     except Exception:
         return abs_path
+
+
+def user_has_keys(username: str) -> bool:
+    """Check whether a keypair exists for the given user."""
+
+    key_data = safe_load_data(f"keys:{username}", None)
+    return bool(key_data and key_data.get("private_key") and key_data.get("public_key"))

@@ -412,14 +412,16 @@ class ZEDKDGApp:
 
         ttk.Label(wrap, text="Выберите существующего пользователя или добавьте нового").pack(anchor="w", pady=(0, 8))
 
-        columns = ("id", "username", "created")
+        columns = ("id", "username", "created", "keys")
         tree = ttk.Treeview(wrap, columns=columns, show="headings", height=10)
         tree.heading("id", text="ID")
         tree.heading("username", text="Имя")
         tree.heading("created", text="Создан")
+        tree.heading("keys", text="Ключи")
         tree.column("id", width=60, anchor="center")
         tree.column("username", width=200, anchor="w")
         tree.column("created", width=180, anchor="w")
+        tree.column("keys", width=120, anchor="center")
         tree.pack(fill="both", expand=True)
 
         entry_frame = ttk.Frame(wrap)
@@ -441,7 +443,8 @@ class ZEDKDGApp:
             for i in tree.get_children():
                 tree.delete(i)
             for u in list_users():
-                tree.insert("", "end", values=(u["id"], u["username"], u["created_at"]))
+                keys_note = "созданы" if u.get("has_keys") else "нет"
+                tree.insert("", "end", values=(u["id"], u["username"], u["created_at"], keys_note))
 
         def finish_select(tv: ttk.Treeview):
             sel = tv.selection()
@@ -450,9 +453,11 @@ class ZEDKDGApp:
                 return
             vals = tv.item(sel[0], "values")
             username = vals[1]
+            keys_note = vals[3] if len(vals) > 3 else "нет"
             self.current_user = username
-            self.user_name_var.set(f"Пользователь: {self.current_user}")
-            self.set_status(f"Пользователь: {self.current_user}")
+            key_suffix = "— ключи уже созданы" if keys_note == "созданы" else "— ключи не созданы"
+            self.user_name_var.set(f"Пользователь: {self.current_user} ({key_suffix})")
+            self.set_status(f"Пользователь: {self.current_user} ({key_suffix})")
             dlg.destroy()
 
         def add_new():
