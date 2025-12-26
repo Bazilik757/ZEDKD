@@ -238,6 +238,7 @@ class ZEDKDGApp:
         ttk.Button(action_bar, text="Регистрация файла", command=self.register_document_dialog, style="CTA.TButton").pack(side="left", padx=(0, 8))
         ttk.Button(action_bar, text="Автопроход", command=self.run_all_steps, style="Primary.TButton").pack(side="left", padx=8)
         ttk.Button(action_bar, text="Следующий этап", command=self.run_next_step, style="Secondary.TButton").pack(side="left", padx=8)
+        ttk.Button(action_bar, text="Удалить документ", command=self.delete_selected_doc, style="Ghost.TButton").pack(side="left", padx=8)
         ttk.Button(action_bar, text="Сгенерировать ключи", command=self.handle_generate_keys, style="Ghost.TButton").pack(side="left", padx=8)
 
         shell_body = ttk.Frame(shell, padding=4, style="Panel.TFrame")
@@ -313,8 +314,20 @@ class ZEDKDGApp:
         list_wrap = ttk.LabelFrame(body, text="Документы", padding=10, style="Card.TLabelframe")
         list_wrap.pack(side="left", fill="both", expand=True, padx=(0, 12))
 
-        self.docs_tree = ttk.Treeview(list_wrap, columns=("id", "type", "title", "status"), show="headings", height=16, style="Modern.Treeview")
-        for col, w, label in [("id", 160, "ID"), ("type", 120, "Тип"), ("title", 340, "Заголовок"), ("status", 260, "Статус")]:
+        self.docs_tree = ttk.Treeview(
+            list_wrap,
+            columns=("id", "type", "title", "status", "path"),
+            show="headings",
+            height=16,
+            style="Modern.Treeview",
+        )
+        for col, w, label in [
+            ("id", 160, "ID"),
+            ("type", 120, "Тип"),
+            ("title", 320, "Заголовок"),
+            ("status", 180, "Статус"),
+            ("path", 280, "Путь файла"),
+        ]:
             self.docs_tree.heading(col, text=label)
             self.docs_tree.column(col, width=w, anchor="w")
         self.docs_tree.pack(fill="both", expand=True)
@@ -333,7 +346,7 @@ class ZEDKDGApp:
 
         self.card_vars = {k: tk.StringVar(value="") for k in [
             "doc_id", "doc_type", "title", "author", "department", "conf",
-            "created_at", "hash", "status", "step", "order_reg_no", "carrier_no"
+            "created_at", "hash", "status", "step", "order_reg_no", "carrier_no", "stored_path"
         ]}
 
         grid = ttk.Frame(card)
@@ -351,11 +364,16 @@ class ZEDKDGApp:
             ("Этап", "step"),
             ("Рег.№ приказа", "order_reg_no"),
             ("Носитель (Ф1)", "carrier_no"),
+            ("Путь к файлу", "stored_path"),
         ]
         for i, (label, key) in enumerate(labels):
             ttk.Label(grid, text=f"{label}:", style="Muted.TLabel").grid(row=i, column=0, sticky="w", pady=2, padx=(0, 6))
-            ttk.Label(grid, textvariable=self.card_vars[key]).grid(row=i, column=1, sticky="w", pady=2)
+            ttk.Label(grid, textvariable=self.card_vars[key], wraplength=520, justify="left").grid(row=i, column=1, sticky="w", pady=2)
         grid.grid_columnconfigure(1, weight=1)
+
+        self.card_summary = tk.Text(card, height=4, wrap="word", background="#0e162a", foreground="#e2e8f0", relief="flat")
+        self.card_summary.pack(fill="x", pady=(10, 0))
+        self.card_summary.configure(state="disabled")
 
         wf = ttk.LabelFrame(right, text="Дорожная карта", padding=10, style="Card.TLabelframe")
         wf.pack(fill="both", expand=True, pady=(10, 0))
@@ -750,7 +768,8 @@ class ZEDKDGApp:
         for i in self.docs_tree.get_children():
             self.docs_tree.delete(i)
         for d in self.docs:
-            self.docs_tree.insert("", "end", values=(d.doc_id, d.doc_type, d.title, d.status))
+            rel_path = relpath_in_storage(d.stored_path)
+            self.docs_tree.insert("", "end", values=(d.doc_id, d.doc_type, d.title, d.status, rel_path))
         self.refresh_metrics()
 
     def select_doc(self, doc_id: str):
@@ -772,6 +791,9 @@ class ZEDKDGApp:
         if not d:
             for v in self.card_vars.values():
                 v.set("")
+            self.card_summary.configure(state="normal")
+            self.card_summary.delete("1.0", "end")
+            self.card_summary.configure(state="disabled")
             return
 
         self.card_vars["doc_id"].set(d.doc_id)
@@ -783,12 +805,24 @@ class ZEDKDGApp:
         self.card_vars["created_at"].set(d.created_at)
         self.card_vars["hash"].set(d.hash_value)
         self.card_vars["status"].set(d.status)
+        self.card_vars["stored_path"].set(relpath_in_storage(d.stored_path))
 
         step_text = ORDER_WORKFLOW_STEPS[d.step_index] if d.step_index < len(ORDER_WORKFLOW_STEPS) else "—"
         self.card_vars["step"].set(step_text)
 
         self.card_vars["order_reg_no"].set(d.order_reg_no or "—")
         self.card_vars["carrier_no"].set(d.carrier_no or "—")
+
+        summary_lines = [
+            f"Файл: {relpath_in_storage(d.stored_path)}",
+            f"Статус: {d.status} (этап: {step_text})",
+            f"Хэш: {d.hash_value}",
+            f"Подпись: {d.sig_path or '—'} | Шифр: {d.enc_path or '—'} | Архив: {d.archived_path or '—'}",
+        ]
+        self.card_summary.configure(state="normal")
+        self.card_summary.delete("1.0", "end")
+        self.card_summary.insert("end", "\n".join(summary_lines))
+        self.card_summary.configure(state="disabled")
 
     def highlight_workflow(self):
         d = self.get_doc()
