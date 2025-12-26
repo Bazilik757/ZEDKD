@@ -1,0 +1,24 @@
+1. CIA (Confidentiality, Integrity, and Availability) - Конфиденциальность, Целостность, Доступность
+
+2. АРМ
+	2.1. ОС
+	2.2. Порты
+	2.3. OSI
+	2.4. localhost, IPv4, MAC-адреса
+	2.5. Сервисы: SSH, HTTP/S, FTP, SMB
+
+3. InfoSec tools
+	3.1. nmap
+	3.2. gobuster
+	3.3. nc
+	
+4. Enumeration
+	4.1. robots.txt
+	4.2. домены
+	4.3. директории
+	*4.4. сканы
+	
+5. Представление информации
+	5.1. Кодирование
+	5.2. Шифрование
+
