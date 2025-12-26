@@ -1,10 +1,10 @@
-import tkinter as tk
+import ttkbootstrap as tb
 
 from zedkd.ui.app import ZEDKDGApp
 
 
 def main():
-    root = tk.Tk()
+    root = tb.Window(themename="superhero")
     ZEDKDGApp(root)
     root.mainloop()
 

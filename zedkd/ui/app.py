@@ -3,7 +3,9 @@ import os
 import shutil
 import tkinter as tk
 from datetime import datetime
-from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter import filedialog, messagebox, simpledialog
+import ttkbootstrap as tb
+from ttkbootstrap import ttk
 from typing import Optional, Dict, Any, List
 
 from ..crypto import (
@@ -66,7 +68,7 @@ class ZEDKDGApp:
             "encrypted": tk.StringVar(value="0"),
         }
 
-        self.style = ttk.Style()
+        self.style = tb.Style(theme="superhero")
         self._init_style()
 
         self.build_ui()
@@ -83,47 +85,48 @@ class ZEDKDGApp:
         self.status_var.set(text)
 
     def _init_style(self):
-        try:
-            self.style.theme_use("clam")
-        except Exception:
-            pass
+        colors = getattr(self.style, "colors", None)
+        accent = getattr(colors, "info", "#22d3ee")
+        surface = getattr(colors, "bg", "#0f172a")
+        card = getattr(colors, "surface", "#0e162a")
+        muted = getattr(colors, "muted", "#94a3b8")
+        primary = getattr(colors, "primary", "#38bdf8")
+        secondary = getattr(colors, "secondary", "#a855f7")
+        success = getattr(colors, "success", "#22c55e")
 
-        self.root.configure(bg="#0b1224")
-        accent = "#22d3ee"
-        surface = "#0f172a"
-        card = "#0e162a"
-        muted = "#94a3b8"
-        primary = "#38bdf8"
-        secondary = "#a855f7"
-        success = "#22c55e"
+        try:
+            self.root.configure(bg=surface)
+        except tk.TclError:
+            self.root.configure(bg="#0b1224")
 
         self.style.configure("TFrame", background=surface)
         self.style.configure("Panel.TFrame", background=surface)
         self.style.configure("Glass.TFrame", background=card)
         self.style.configure("Title.TLabel", font=("Inter", 19, "bold"), foreground=accent, background=surface)
         self.style.configure("Muted.TLabel", foreground=muted, background=surface, font=("Inter", 10))
-        self.style.configure("Pill.TLabel", background="#1e293b", foreground="#e2e8f0", padding=(10, 4), font=("Inter", 9, "bold"))
+        self.style.configure("Pill.TLabel", background=getattr(colors, "secondary", "#1e293b"), foreground=getattr(colors, "light", "#e2e8f0"), padding=(10, 4), font=("Inter", 9, "bold"))
         self.style.configure("Card.TLabelframe", background=card, relief="solid", borderwidth=1)
         self.style.configure("Card.TLabelframe.Label", background=card, foreground=accent, font=("Inter", 11, "bold"))
-        self.style.configure("Accent.TButton", padding=10, font=("Inter", 10, "bold"), relief="flat")
-        self.style.map("Accent.TButton", background=[("active", accent)], foreground=[("!disabled", "#0b1224")])
-        self.style.configure("Primary.TButton", padding=12, font=("Inter", 10, "bold"), relief="flat")
-        self.style.map("Primary.TButton", background=[("active", primary)], foreground=[("!disabled", "#0b1224")])
-        self.style.configure("Secondary.TButton", padding=12, font=("Inter", 10, "bold"), relief="flat")
-        self.style.map("Secondary.TButton", background=[("active", secondary)], foreground=[("!disabled", "#0b1224")])
-        self.style.configure("Ghost.TButton", padding=8, font=("Inter", 10), relief="flat")
-        self.style.map("Ghost.TButton", foreground=[("!disabled", accent)], background=[("active", "#1f2937")])
-        self.style.configure("CTA.TButton", padding=12, font=("Inter", 11, "bold"), relief="flat")
-        self.style.map("CTA.TButton", background=[("!disabled", "#f97316"), ("active", "#fb923c")], foreground=[("!disabled", "#0b1224")])
-        self.style.configure("Nav.TButton", padding=(14, 10), font=("Inter", 10, "bold"), relief="flat", background="#111827")
-        self.style.map("Nav.TButton", background=[("active", "#1f2937")], foreground=[("!disabled", "#cbd5e1")])
 
-        self.style.configure("Modern.Treeview", background=card, fieldbackground=card, foreground="#e2e8f0", rowheight=26, borderwidth=0)
-        self.style.map("Modern.Treeview", background=[("selected", "#1d4ed8")], foreground=[("selected", "#e2e8f0")])
-        self.style.configure("Modern.Treeview.Heading", background=surface, foreground="#cbd5e1", relief="flat", font=("Inter", 10, "bold"))
+        self.style.configure("Accent.TButton", padding=10, font=("Inter", 10, "bold"), relief="flat")
+        self.style.map("Accent.TButton", background=[("active", accent)], foreground=[("!disabled", getattr(colors, "bg", "#0b1224"))])
+        self.style.configure("Primary.TButton", padding=12, font=("Inter", 10, "bold"), relief="flat")
+        self.style.map("Primary.TButton", background=[("active", primary)], foreground=[("!disabled", getattr(colors, "bg", "#0b1224"))])
+        self.style.configure("Secondary.TButton", padding=12, font=("Inter", 10, "bold"), relief="flat")
+        self.style.map("Secondary.TButton", background=[("active", secondary)], foreground=[("!disabled", getattr(colors, "bg", "#0b1224"))])
+        self.style.configure("Ghost.TButton", padding=8, font=("Inter", 10), relief="flat")
+        self.style.map("Ghost.TButton", foreground=[("!disabled", accent)], background=[("active", getattr(colors, "selectbg", "#1f2937"))])
+        self.style.configure("CTA.TButton", padding=12, font=("Inter", 11, "bold"), relief="flat")
+        self.style.map("CTA.TButton", background=[("!disabled", getattr(colors, "warning", "#f97316")), ("active", getattr(colors, "warning", "#fb923c"))], foreground=[("!disabled", getattr(colors, "bg", "#0b1224"))])
+        self.style.configure("Nav.TButton", padding=(14, 10), font=("Inter", 10, "bold"), relief="flat", background=getattr(colors, "dark", "#111827"))
+        self.style.map("Nav.TButton", background=[("active", getattr(colors, "selectbg", "#1f2937"))], foreground=[("!disabled", getattr(colors, "light", "#cbd5e1"))])
+
+        self.style.configure("Modern.Treeview", background=card, fieldbackground=card, foreground=getattr(colors, "light", "#e2e8f0"), rowheight=26, borderwidth=0)
+        self.style.map("Modern.Treeview", background=[("selected", getattr(colors, "primary", "#1d4ed8"))], foreground=[("selected", getattr(colors, "bg", "#e2e8f0"))])
+        self.style.configure("Modern.Treeview.Heading", background=surface, foreground=getattr(colors, "muted", "#cbd5e1"), relief="flat", font=("Inter", 10, "bold"))
         self.style.configure("Modern.TNotebook", background=surface, tabposition="n")
-        self.style.configure("Modern.TNotebook.Tab", padding=(16, 10), background=card, foreground="#e2e8f0", font=("Inter", 10, "bold"))
-        self.style.map("Modern.TNotebook.Tab", background=[("selected", "#1f2937")], foreground=[("selected", accent)])
+        self.style.configure("Modern.TNotebook.Tab", padding=(16, 10), background=card, foreground=getattr(colors, "light", "#e2e8f0"), font=("Inter", 10, "bold"))
+        self.style.map("Modern.TNotebook.Tab", background=[("selected", getattr(colors, "selectbg", "#1f2937"))], foreground=[("selected", accent)])
 
         self.style.configure("Success.TLabel", foreground=success, background=surface, font=("Inter", 10, "bold"))
 
